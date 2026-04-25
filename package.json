@@ -1,0 +1,41 @@
+{
+  "name": "accountir-events",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for producing accounting events that accountir can sync",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./h3": {
+      "import": "./dist/adapters/h3.js",
+      "types": "./dist/adapters/h3.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format:check": "prettier --check 'src/**/*.ts' 'test/**/*.ts'"
+  },
+  "devDependencies": {
+    "h3": "^1.15.3",
+    "prettier": "^3.8.3",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.1"
+  },
+  "peerDependencies": {
+    "h3": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "h3": {
+      "optional": true
+    }
+  }
+}
