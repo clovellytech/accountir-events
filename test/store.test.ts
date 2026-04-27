@@ -3,6 +3,7 @@ import { MemoryEventStore } from "../src/store.js"
 import type {
   SaleEvent,
   PurchaseOrderEvent,
+  GoodsReceivedEvent,
   InventoryAdjustmentEvent,
 } from "../src/types.js"
 
@@ -26,7 +27,16 @@ const po: PurchaseOrderEvent = {
   reference: "PO-042",
   supplier: "Shimano",
   items: [{ name: "Chain", qty: 10, unit_cost_cents: 1500 }],
-  payment: "on_credit",
+  expected_delivery_date: "2026-05-01",
+}
+
+const goodsReceived: GoodsReceivedEvent = {
+  date: "2026-05-01",
+  reference: "GR-042",
+  supplier: "Shimano",
+  items: [{ name: "Chain", qty: 10, unit_cost_cents: 1500 }],
+  purchase_order_reference: "PO-042",
+  payment_terms: "net30",
 }
 
 const adj: InventoryAdjustmentEvent = {
@@ -48,6 +58,7 @@ describe("MemoryEventStore", () => {
 
     const e2 = await store.append("purchase_order", po)
     expect(e2.id).toBe("2")
+    expect(e2.type).toBe("purchase_order")
 
     const result = await store.list()
     expect(result.events).toHaveLength(2)
@@ -55,11 +66,39 @@ describe("MemoryEventStore", () => {
     expect(result.has_more).toBe(false)
   })
 
+  it("handles goods_received events", async () => {
+    const store = new MemoryEventStore()
+
+    const e1 = await store.append("goods_received", goodsReceived)
+    expect(e1.id).toBe("1")
+    expect(e1.type).toBe("goods_received")
+    expect(e1.data).toEqual(goodsReceived)
+
+    const result = await store.list()
+    expect(result.events).toHaveLength(1)
+    expect(result.events[0].type).toBe("goods_received")
+  })
+
+  it("supports full procurement flow", async () => {
+    const store = new MemoryEventStore()
+
+    // 1. PO placed (commitment)
+    await store.append("purchase_order", po)
+
+    // 2. Goods arrive (inventory + AP bill)
+    await store.append("goods_received", goodsReceived)
+
+    const result = await store.list()
+    expect(result.events).toHaveLength(2)
+    expect(result.events[0].type).toBe("purchase_order")
+    expect(result.events[1].type).toBe("goods_received")
+  })
+
   it("paginates with cursor", async () => {
     const store = new MemoryEventStore()
 
     await store.append("sale", sale)
-    await store.append("purchase_order", po)
+    await store.append("goods_received", goodsReceived)
     await store.append("inventory_adjustment", adj)
 
     const page1 = await store.list({ limit: 2 })
@@ -94,7 +133,7 @@ describe("MemoryEventStore", () => {
   it("returns all events when cursor is unknown", async () => {
     const store = new MemoryEventStore()
     await store.append("sale", sale)
-    await store.append("purchase_order", po)
+    await store.append("goods_received", goodsReceived)
 
     const result = await store.list({ since: "nonexistent" })
     expect(result.events).toHaveLength(2)

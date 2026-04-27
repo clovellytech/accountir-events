@@ -1,6 +1,7 @@
 export type AccountirEventType =
   | "sale"
   | "purchase_order"
+  | "goods_received"
   | "inventory_adjustment"
 
 // -- Sale --
@@ -21,7 +22,7 @@ export interface SaleEvent {
   tax_collected_cents?: number
 }
 
-// -- Purchase Order --
+// -- Purchase Order (commitment — no journal entry) --
 
 export interface PurchaseItem {
   name: string
@@ -29,13 +30,41 @@ export interface PurchaseItem {
   unit_cost_cents: number
 }
 
+/**
+ * A purchase order placed with a vendor. This is a commitment to buy —
+ * no journal entry is created until goods are received.
+ *
+ * @deprecated If your old code sends `purchase_order` with a `payment` field,
+ * accountir will treat it as a legacy goods-received event for backwards compatibility.
+ * New integrations should emit `goods_received` when inventory arrives.
+ */
 export interface PurchaseOrderEvent {
   date: string
   reference?: string
   memo?: string
   supplier?: string
   items: PurchaseItem[]
-  payment: "cash" | "on_credit"
+  expected_delivery_date?: string
+  /** @deprecated Use `goods_received` event type instead. Kept for backwards compatibility. */
+  payment?: "cash" | "on_credit"
+}
+
+// -- Goods Received (inventory arrives — creates journal entry + AP bill) --
+
+/**
+ * Goods received from a vendor. Creates a journal entry (DR inventory / CR AP)
+ * and an accounts payable bill that tracks payment status and due date.
+ */
+export interface GoodsReceivedEvent {
+  date: string
+  reference?: string
+  memo?: string
+  supplier?: string
+  items: PurchaseItem[]
+  /** Reference to the original purchase order, if any */
+  purchase_order_reference?: string
+  /** Payment terms: "net30", "net60", "net90", "due-on-receipt", or number of days */
+  payment_terms?: string
 }
 
 // -- Inventory Adjustment --
@@ -59,6 +88,7 @@ export interface InventoryAdjustmentEvent {
 export type AccountirEventData =
   | SaleEvent
   | PurchaseOrderEvent
+  | GoodsReceivedEvent
   | InventoryAdjustmentEvent
 
 // -- Stored event envelope --

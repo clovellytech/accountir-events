@@ -1,6 +1,6 @@
 # accountir-events
 
-TypeScript SDK for producing accounting events that [accountir](https://github.com/user/accountir) can sync. Any app that records sales, purchase orders, or inventory adjustments can use this library to make those events available to accountir's pull-based sync.
+TypeScript SDK for producing accounting events that [accountir](https://github.com/user/accountir) can sync. Any app that records sales, purchase orders, goods receipts, or inventory adjustments can use this library to make those events available to accountir's pull-based sync.
 
 ## How it works
 
@@ -68,7 +68,7 @@ await store.append("sale", {
   tax_collected_cents: 1120,
 })
 
-// Record a purchase order received
+// Place a purchase order (commitment — no journal entry yet)
 await store.append("purchase_order", {
   date: "2026-04-20",
   reference: "PO-2026-042",
@@ -76,7 +76,19 @@ await store.append("purchase_order", {
   items: [
     { name: "CN-HG701 Chain", qty: 20, unit_cost_cents: 2499 },
   ],
-  payment: "on_credit",
+  expected_delivery_date: "2026-05-01",
+})
+
+// Goods received from vendor (creates inventory entry + AP bill)
+await store.append("goods_received", {
+  date: "2026-05-01",
+  reference: "GR-2026-042",
+  supplier: "Shimano",
+  items: [
+    { name: "CN-HG701 Chain", qty: 20, unit_cost_cents: 2499 },
+  ],
+  purchase_order_reference: "PO-2026-042",
+  payment_terms: "net30",
 })
 
 // Record an inventory adjustment
@@ -140,6 +152,24 @@ const result = await handler({
 
 ### Purchase Order
 
+A commitment to buy from a vendor. No journal entry is created — this is an off-ledger record. Use `goods_received` when inventory actually arrives.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `date` | string | yes | `YYYY-MM-DD` |
+| `reference` | string | no | Unique ID for idempotency |
+| `memo` | string | no | Description |
+| `supplier` | string | no | Supplier name |
+| `items` | PurchaseItem[] | yes | At least one item |
+| `items[].name` | string | yes | Product name |
+| `items[].qty` | number | yes | Quantity ordered |
+| `items[].unit_cost_cents` | number | yes | Cost per unit |
+| `expected_delivery_date` | string | no | `YYYY-MM-DD` |
+
+### Goods Received
+
+Inventory arrives from a vendor. Creates a journal entry (DR inventory / CR accounts payable) and an AP bill with due date tracking.
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `date` | string | yes | `YYYY-MM-DD` |
@@ -150,7 +180,8 @@ const result = await handler({
 | `items[].name` | string | yes | Product name |
 | `items[].qty` | number | yes | Quantity received |
 | `items[].unit_cost_cents` | number | yes | Cost per unit |
-| `payment` | string | yes | `"cash"` or `"on_credit"` |
+| `purchase_order_reference` | string | no | Links to the original PO |
+| `payment_terms` | string | no | `"net30"`, `"net60"`, `"due-on-receipt"`, etc. Defaults to net30 |
 
 ### Inventory Adjustment
 

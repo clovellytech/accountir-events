@@ -4,6 +4,7 @@ export type {
   SaleItem,
   PurchaseOrderEvent,
   PurchaseItem,
+  GoodsReceivedEvent,
   InventoryAdjustmentEvent,
   AdjustmentItem,
   AccountirEventData,
