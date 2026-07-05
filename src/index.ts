@@ -2,6 +2,7 @@ export type {
   AccountirEventType,
   SaleEvent,
   SaleItem,
+  RefundEvent,
   PurchaseOrderEvent,
   PurchaseItem,
   GoodsReceivedEvent,

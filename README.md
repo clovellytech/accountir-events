@@ -1,6 +1,6 @@
 # accountir-events
 
-TypeScript SDK for producing accounting events that [accountir](https://github.com/user/accountir) can sync. Any app that records sales, purchase orders, goods receipts, or inventory adjustments can use this library to make those events available to accountir's pull-based sync.
+TypeScript SDK for producing accounting events that [accountir](https://github.com/user/accountir) can sync. Any app that records sales, refunds, purchase orders, goods receipts, or inventory adjustments can use this library to make those events available to accountir's pull-based sync.
 
 ## How it works
 
@@ -66,6 +66,23 @@ await store.append("sale", {
   ],
   payment_method: "square",
   tax_collected_cents: 1120,
+})
+
+// Record a refund / return (reverse of a sale)
+await store.append("refund", {
+  date: "2026-04-26",
+  reference: "REFUND-20260426-001",
+  items: [
+    {
+      name: "Continental GP5000 700c",
+      qty: 1,
+      unit_price_cents: 6999,
+      unit_cost_cents: 3500,
+    },
+  ],
+  payment_method: "square",
+  tax_refunded_cents: 560,
+  restock: true,
 })
 
 // Place a purchase order (commitment — no journal entry yet)
@@ -149,6 +166,28 @@ const result = await handler({
 | `items[].unit_cost_cents` | number | yes | Cost per unit (for COGS) |
 | `payment_method` | string | yes | `"cash"` or `"square"` |
 | `tax_collected_cents` | number | no | Sales tax in cents |
+
+Posts: **DR** payment (revenue + tax) / **CR** sales revenue / **CR** sales tax payable (if any); **DR** COGS / **CR** inventory when items carry a cost.
+
+### Refund
+
+A refund or return — the reverse of a sale. The returned revenue is booked against a contra-revenue account (map it to e.g. `Income:refunds`) so it subtracts from income.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `date` | string | yes | `YYYY-MM-DD` |
+| `reference` | string | no | Unique ID for idempotency |
+| `memo` | string | no | Description |
+| `items` | SaleItem[] | yes | Returned items (same shape as a sale's) |
+| `items[].name` | string | yes | Product name |
+| `items[].qty` | number | yes | Quantity returned |
+| `items[].unit_price_cents` | number | yes | Refunded price per unit (drives the contra-revenue) |
+| `items[].unit_cost_cents` | number | yes | Cost per unit (drives restock / COGS reversal) |
+| `payment_method` | string | yes | `"cash"` or `"square"` — how the money is returned |
+| `tax_refunded_cents` | number | no | Sales tax refunded, in cents |
+| `restock` | boolean | no | Put items back in inventory. Defaults to `true` |
+
+Posts: **DR** refunds (returned revenue) / **CR** payment (revenue + tax) / **DR** sales tax payable (if any); **DR** inventory / **CR** COGS when `restock` and items carry a cost. Restock lines only post when items have a non-zero `unit_cost_cents`, so a goodwill refund just reverses revenue and tax.
 
 ### Purchase Order
 

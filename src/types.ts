@@ -1,5 +1,6 @@
 export type AccountirEventType =
   | "sale"
+  | "refund"
   | "purchase_order"
   | "goods_received"
   | "inventory_adjustment"
@@ -20,6 +21,26 @@ export interface SaleEvent {
   items: SaleItem[]
   payment_method: "cash" | "square"
   tax_collected_cents?: number
+}
+
+// -- Refund / Return (the reverse of a sale) --
+
+/**
+ * A refund or return. Books the returned revenue against the `refunds`
+ * contra-revenue account (so it subtracts from income), returns the money via
+ * the payment method, reverses sales tax, and — when `restock` is set and the
+ * returned items carry a unit cost — puts the items back into inventory and
+ * reverses COGS.
+ */
+export interface RefundEvent {
+  date: string
+  reference?: string
+  memo?: string
+  items: SaleItem[]
+  payment_method: "cash" | "square"
+  tax_refunded_cents?: number
+  /** Whether returned items go back into inventory. Defaults to true. */
+  restock?: boolean
 }
 
 // -- Purchase Order (commitment — no journal entry) --
@@ -87,6 +108,7 @@ export interface InventoryAdjustmentEvent {
 
 export type AccountirEventData =
   | SaleEvent
+  | RefundEvent
   | PurchaseOrderEvent
   | GoodsReceivedEvent
   | InventoryAdjustmentEvent
