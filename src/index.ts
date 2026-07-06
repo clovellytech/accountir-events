@@ -2,6 +2,8 @@ export type {
   AccountirEventType,
   SaleEvent,
   SaleItem,
+  PaymentMethod,
+  Payment,
   RefundEvent,
   PurchaseOrderEvent,
   PurchaseItem,

@@ -1,6 +1,6 @@
 {
   "name": "accountir-events",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "TypeScript SDK for producing accounting events that accountir can sync",
   "license": "MIT",
   "type": "module",

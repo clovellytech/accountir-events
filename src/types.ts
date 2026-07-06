@@ -14,12 +14,28 @@ export interface SaleItem {
   unit_cost_cents: number
 }
 
+/** How money moves in/out for a sale or refund. */
+export type PaymentMethod = "cash" | "square" | "stripe"
+
+/** One tender in a split-tender transaction (e.g. a Stripe deposit followed by
+ *  the balance on Square in store). */
+export interface Payment {
+  method: PaymentMethod
+  amount_cents: number
+}
+
 export interface SaleEvent {
   date: string
   reference?: string
   memo?: string
   items: SaleItem[]
-  payment_method: "cash" | "square"
+  /**
+   * Split tender: one entry per payment method used. Must sum to revenue + tax.
+   * Preferred over the legacy single `payment_method`. Provide one or the other.
+   */
+  payments?: Payment[]
+  /** @deprecated Legacy single method. Use `payments` for split tender. */
+  payment_method?: PaymentMethod
   tax_collected_cents?: number
 }
 
@@ -37,7 +53,11 @@ export interface RefundEvent {
   reference?: string
   memo?: string
   items: SaleItem[]
-  payment_method: "cash" | "square"
+  /** Split tender: how the refund is returned across methods. Must sum to
+   *  revenue + tax. Preferred over the legacy single `payment_method`. */
+  payments?: Payment[]
+  /** @deprecated Legacy single method. Use `payments` for split tender. */
+  payment_method?: PaymentMethod
   tax_refunded_cents?: number
   /** Whether returned items go back into inventory. Defaults to true. */
   restock?: boolean

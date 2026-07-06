@@ -68,6 +68,20 @@ await store.append("sale", {
   tax_collected_cents: 1120,
 })
 
+// A sale paid with split tender — a Stripe deposit online, balance on Square in
+// store. `payments` must sum to revenue + tax.
+await store.append("sale", {
+  date: "2026-04-25",
+  reference: "POS-20260425-002",
+  items: [
+    { name: "Custom wheelset", qty: 1, unit_price_cents: 90000, unit_cost_cents: 60000 },
+  ],
+  payments: [
+    { method: "stripe", amount_cents: 20000 },
+    { method: "square", amount_cents: 70000 },
+  ],
+})
+
 // Record a refund / return (reverse of a sale)
 await store.append("refund", {
   date: "2026-04-26",
@@ -164,10 +178,15 @@ const result = await handler({
 | `items[].qty` | number | yes | Quantity sold |
 | `items[].unit_price_cents` | number | yes | Retail price per unit |
 | `items[].unit_cost_cents` | number | yes | Cost per unit (for COGS) |
-| `payment_method` | string | yes | `"cash"` or `"square"` |
+| `payments` | Payment[] | yes* | Split tender — `{ method, amount_cents }[]`; must sum to revenue + tax |
+| `payments[].method` | string | yes | `"cash"`, `"square"`, or `"stripe"` |
+| `payments[].amount_cents` | number | yes | Amount on this method |
+| `payment_method` | string | yes* | *Legacy* single method (`"cash"`/`"square"`/`"stripe"`). Provide this **or** `payments` |
 | `tax_collected_cents` | number | no | Sales tax in cents |
 
-Posts: **DR** payment (revenue + tax) / **CR** sales revenue / **CR** sales tax payable (if any); **DR** COGS / **CR** inventory when items carry a cost.
+\*Provide either `payments` (preferred, supports split tender) or the legacy single `payment_method`.
+
+Posts: **DR** each payment method's account · **CR** sales revenue · **CR** sales tax payable (if any); **DR** COGS / **CR** inventory when items carry a cost.
 
 ### Refund
 
@@ -183,11 +202,12 @@ A refund or return — the reverse of a sale. The returned revenue is booked aga
 | `items[].qty` | number | yes | Quantity returned |
 | `items[].unit_price_cents` | number | yes | Refunded price per unit (drives the contra-revenue) |
 | `items[].unit_cost_cents` | number | yes | Cost per unit (drives restock / COGS reversal) |
-| `payment_method` | string | yes | `"cash"` or `"square"` — how the money is returned |
+| `payments` | Payment[] | yes* | Split tender the refund is returned across; must sum to revenue + tax |
+| `payment_method` | string | yes* | *Legacy* single method the money is returned via. Provide this **or** `payments` |
 | `tax_refunded_cents` | number | no | Sales tax refunded, in cents |
 | `restock` | boolean | no | Put items back in inventory. Defaults to `true` |
 
-Posts: **DR** refunds (returned revenue) / **CR** payment (revenue + tax) / **DR** sales tax payable (if any); **DR** inventory / **CR** COGS when `restock` and items carry a cost. Restock lines only post when items have a non-zero `unit_cost_cents`, so a goodwill refund just reverses revenue and tax.
+Posts: **DR** refunds (returned revenue) · **CR** each payment method's account · **DR** sales tax payable (if any); **DR** inventory / **CR** COGS when `restock` and items carry a cost. Restock lines only post when items have a non-zero `unit_cost_cents`, so a goodwill refund just reverses revenue and tax.
 
 ### Purchase Order
 
